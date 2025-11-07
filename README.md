@@ -96,6 +96,27 @@ The system will:
 - Write outputs to `generated_project/`
 - Print the final state on completion
 
+### Streamlit UI
+
+Run an interactive UI in your browser:
+
+```powershell
+streamlit run streamlit_app.py
+```
+
+- Enter your prompt, adjust recursion limit, and run.
+- Outputs appear under `generated_project/` and are viewable in the UI.
+
+### Deploy (Procfile)
+
+This repo includes a `Procfile` for platform deployment (e.g., Heroku/Render/Railway). The web process runs Streamlit:
+
+```
+web: streamlit run streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+```
+
+Ensure the environment variable `GITHUB_TOKEN` is set on the platform, and that `requirements.txt` is installed at build time.
+
 ## Project structure
 
 ```

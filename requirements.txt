@@ -7,3 +7,5 @@ requests
 langgraph
 pydantic
 streamlit
+groq
+langchain-groq

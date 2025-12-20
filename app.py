@@ -21,7 +21,8 @@ PROJECT_DIR = Path(init_project_root())
 st.set_page_config(page_title="Lovable Clone", page_icon="💜", layout="wide")
 # Initialize session state for API keys (not persisted to disk)
 if "OPENAI_API_KEY" not in st.session_state:
-    st.session_state["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "")
+    # Do not prefill from environment; require user input
+    st.session_state["OPENAI_API_KEY"] = ""
 
 
 # Lightweight custom CSS to evoke a "lovable" colorful aesthetic

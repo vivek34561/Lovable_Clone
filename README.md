@@ -35,12 +35,13 @@ Key tools (in `agent/tools.py`):
 ## Requirements
 
 - Python 3.10+
-- A GitHub Models access token set as `GITHUB_TOKEN` (used via the OpenAI-compatible API). The model runs through `https://models.inference.ai.azure.com` using the `ChatOpenAI` interface.
+- Groq API key set as `GROQ_API_KEY` (used via the `langchain-groq` ChatGroq interface).
+- Alternatively, you can configure an OpenAI-compatible endpoint and token (e.g., GitHub Models) — adjust `agent/graph.py` accordingly.
 
 Python packages (see `requirements.txt`):
-- `langgraph`, `langchain`, `langchain-openai`, `openai`, `pydantic`, `requests`, `dotenv` (aka `python-dotenv`)
+- `langgraph`, `langchain`, `langchain-groq`, `groq`, `pydantic`, `requests`, `python-dotenv`, `streamlit`
 
-Note: If you encounter import issues for `dotenv`, install `python-dotenv` explicitly.
+Note: If you encounter import issues for env loading, ensure `python-dotenv` is installed.
 
 ## Setup (Windows / PowerShell)
 
@@ -57,18 +58,18 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-3) Provide your model credentials
+3) Provide your model credentials (Groq)
 
 Create a `.env` file in the repo root or export in your session:
 
 ```
-GITHUB_TOKEN=ghp_your_token_here
+GROQ_API_KEY=your_groq_key_here
 ```
 
 Or in PowerShell for a one-off session:
 
 ```powershell
-$env:GITHUB_TOKEN = "ghp_your_token_here"
+$env:GROQ_API_KEY = "your_groq_key_here"
 ```
 
 ## Run
@@ -96,26 +97,33 @@ The system will:
 - Write outputs to `generated_project/`
 - Print the final state on completion
 
-### Streamlit UI
+### Streamlit UI (Preview + Download)
 
-Run an interactive UI in your browser:
+Run an interactive UI in your browser via `app.py`:
+
+```powershell
+streamlit run app.py
+```
+
+- Enter your prompt, adjust recursion limit, and run.
+- Preview generated HTML/CSS/JS (the UI attempts to render pages and list files).
+- Download buttons allow you to export `generated_project` as a `.zip`, and optionally the whole code + outputs as a single archive.
+
+If you prefer a separate UI file, you can use `streamlit_app.py` similarly:
 
 ```powershell
 streamlit run streamlit_app.py
 ```
-
-- Enter your prompt, adjust recursion limit, and run.
-- Outputs appear under `generated_project/` and are viewable in the UI.
 
 ### Deploy (Procfile)
 
 This repo includes a `Procfile` for platform deployment (e.g., Heroku/Render/Railway). The web process runs Streamlit:
 
 ```
-web: streamlit run streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+web: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
 ```
 
-Ensure the environment variable `GITHUB_TOKEN` is set on the platform, and that `requirements.txt` is installed at build time.
+Ensure the environment variable `GROQ_API_KEY` is set on the platform, and that `requirements.txt` is installed at build time.
 
 ## Project structure
 
@@ -134,8 +142,8 @@ Ensure the environment variable `GITHUB_TOKEN` is set on the platform, and that 
 
 ## Configuration
 
-- Model: change the `model` name or `temperature` in `agent/graph.py` where `ChatOpenAI` is created.
-- Provider/endpoint: `base_url` is set to `https://models.inference.ai.azure.com`. Keep or modify as needed for your provider.
+- Model: change the `model` name or `temperature` in `agent/graph.py` where `ChatGroq` (or your chosen LLM) is created.
+- Provider/endpoint: if switching to OpenAI-compatible endpoints, adjust the client and environment variables accordingly.
 - Tools: to enable shell execution inside the agent, add `run_cmd` to `coder_tools` in `agent/graph.py` (use carefully).
 - Safety: writes are restricted to `generated_project/` by `safe_path_for_project`. If a task references a path outside this folder, it will fail by design.
 
@@ -143,9 +151,23 @@ Ensure the environment variable `GITHUB_TOKEN` is set on the platform, and that 
 
 - No files appear? Ensure your prompt requests concrete files or that the planner/architect produce file targets.
 - Empty reads are allowed: `read_file` returns `""` if a path doesn’t exist yet.
-- “Attempt to write outside project root”: Tasks must target paths under `generated_project/`.
-- Authentication errors: verify `GITHUB_TOKEN` and that the token has access to GitHub Models.
-- `dotenv` vs `python-dotenv`: If `.env` isn’t loading, `pip install python-dotenv` explicitly.
+- “Attempt to write outside project root”: Paths must be inside `generated_project/`. If you see this error, remove leading slashes from file paths (e.g., use `index.html` instead of `/index.html`) and ensure relative paths.
+- Authentication errors: verify `GROQ_API_KEY` and that your provider credentials are set.
+- Env loading: ensure `.env` exists or export variables in your shell; install `python-dotenv` if needed.
+
+### Download archives manually (PowerShell)
+
+Create a zip of the generated output:
+
+```powershell
+Compress-Archive -Path .\generated_project -DestinationPath .\generated_project.zip -Force
+```
+
+Create a zip of code + outputs:
+
+```powershell
+Compress-Archive -Path .\agent, .\generated_project, .\main.py, .\README.md -DestinationPath .\code_and_generated_project.zip -Force
+```
 
 ## Extending
 

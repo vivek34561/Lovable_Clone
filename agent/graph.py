@@ -2,11 +2,13 @@ from dotenv import load_dotenv
 try:
     from langchain_core.globals import set_verbose, set_debug
 except ImportError:
-    from langchain_core.globals import set_verbose, set_debug
+    # Fallback for older LangChain versions
+    from langchain.globals import set_verbose, set_debug
 from langchain_groq.chat_models import ChatGroq
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 from langgraph.prebuilt import create_react_agent
+import re
 
 from agent.prompt import *
 from agent.states import *
@@ -24,7 +26,7 @@ def build_agent(llm):
     def planner_agent(state: dict) -> dict:
         """Converts user prompt into a structured Plan."""
         user_prompt = state["user_prompt"]
-        resp = llm.with_structured_output(Plan).invoke(
+        resp = llm.with_structured_output(Plan, strict=True).invoke(
             planner_prompt(user_prompt)
         )
         if resp is None:
@@ -34,14 +36,17 @@ def build_agent(llm):
     def architect_agent(state: dict) -> dict:
         """Creates TaskPlan from Plan."""
         plan: Plan = state["plan"]
-        resp = llm.with_structured_output(TaskPlan).invoke(
+        resp = llm.with_structured_output(TaskPlan, strict=True).invoke(
             architect_prompt(plan=plan.model_dump_json())
         )
         if resp is None:
             raise ValueError("Planner did not return a valid response.")
 
-        resp.plan = plan
-        print(resp.model_dump_json())
+        # Log the structured task plan
+        try:
+            print(resp.model_dump_json())
+        except Exception:
+            pass
         return {"task_plan": resp}
 
     def coder_agent(state: dict) -> dict:
@@ -74,25 +79,79 @@ def build_agent(llm):
         coder_state.current_step_idx += 1
         return {"coder_state": coder_state}
 
+    def frontend_check_agent(state: dict) -> dict:
+        """Validate that HTML links to CSS/JS correctly within generated_project."""
+        # List all files in the project
+        listing = list_files.run(".")
+        files = [line.strip() for line in listing.splitlines() if line.strip()]
+        html_files = [f for f in files if f.lower().endswith(".html")]
+
+        if not html_files:
+            return {
+                "frontend_validation": {
+                    "status": "NO_HTML",
+                    "details": "No HTML files found in generated_project.",
+                }
+            }
+
+        # Prefer index.html if present
+        html_file = next((f for f in html_files if f.lower().endswith("index.html")), html_files[0])
+        html_content = read_file.run(html_file)
+
+        # Extract CSS href and JS src
+        css_href_match = re.search(r"<link[^>]*href=\"([^\"]+)\"", html_content, re.IGNORECASE)
+        js_src_match = re.search(r"<script[^>]*src=\"([^\"]+)\"", html_content, re.IGNORECASE)
+
+        css_href = css_href_match.group(1) if css_href_match else None
+        js_src = js_src_match.group(1) if js_src_match else None
+
+        css_exists = bool(css_href and read_file.run(css_href))
+        js_exists = bool(js_src and read_file.run(js_src))
+
+        status = "OK" if css_exists and js_exists else "ISSUES"
+        details = []
+        if not css_href:
+            details.append("Missing <link ... href=...> to CSS")
+        elif not css_exists:
+            details.append(f"CSS file not found: {css_href}")
+        if not js_src:
+            details.append("Missing <script ... src=...> to JS")
+        elif not js_exists:
+            details.append(f"JS file not found: {js_src}")
+
+        return {
+            "frontend_validation": {
+                "status": status,
+                "html_file": html_file,
+                "css_href": css_href,
+                "js_src": js_src,
+                "css_exists": css_exists,
+                "js_exists": js_exists,
+                "details": "; ".join(details) if details else "",
+            }
+        }
+
     graph = StateGraph(dict)
 
     graph.add_node("planner", planner_agent)
     graph.add_node("architect", architect_agent)
     graph.add_node("coder", coder_agent)
+    graph.add_node("frontend_check", frontend_check_agent)
 
     graph.add_edge("planner", "architect")
     graph.add_edge("architect", "coder")
     graph.add_conditional_edges(
         "coder",
-        lambda s: "END" if s.get("status") == "DONE" else "coder",
-        {"END": END, "coder": "coder"}
+        lambda s: "frontend_check" if s.get("status") == "DONE" else "coder",
+        {"frontend_check": "frontend_check", "coder": "coder"}
     )
+    graph.add_edge("frontend_check", END)
 
     graph.set_entry_point("planner")
     return graph.compile()
 
 
-# Default agent using Groq when running this module directly
+# Default agent for CLI usage
 default_llm = ChatGroq(model="openai/gpt-oss-120b")
 agent = build_agent(default_llm)
 

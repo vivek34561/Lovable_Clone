@@ -4,11 +4,9 @@ from pathlib import Path
 import time
 import io
 import zipfile
-
 import streamlit as st
 from dotenv import load_dotenv
-from pydantic import BaseModel
-
+from pydantic import BaseModel   
 from agent.graph import build_agent
 from agent.tools import init_project_root
 
@@ -107,6 +105,40 @@ with st.sidebar:
     # (Environment status removed per request)
 
 # Sidebar: Live preview & download (render later too after run)
+def inline_assets(html_text: str, html_path: Path) -> str:
+    """Inline local CSS/JS referenced by relative tags for more reliable Streamlit preview."""
+    try:
+        base_dir = html_path.parent
+        # Inline <link rel="stylesheet" href="...">
+        import re
+        def repl_link(m):
+            href = m.group(1).strip().strip('"\'')
+            target = (base_dir / href).resolve()
+            try:
+                if PROJECT_DIR.resolve() in target.parents or target.parent == PROJECT_DIR.resolve() or target == PROJECT_DIR.resolve():
+                    css = target.read_text(encoding="utf-8", errors="replace")
+                    return f"<style>\n{css}\n</style>"
+            except Exception:
+                pass
+            return m.group(0)
+        html_text = re.sub(r"<link[^>]*rel=\"stylesheet\"[^>]*href=\"([^\"]+)\"[^>]*>", repl_link, html_text, flags=re.IGNORECASE)
+
+        # Inline <script src="..."></script>
+        def repl_script(m):
+            src = m.group(1).strip().strip('"\'')
+            target = (base_dir / src).resolve()
+            try:
+                if PROJECT_DIR.resolve() in target.parents or target.parent == PROJECT_DIR.resolve() or target == PROJECT_DIR.resolve():
+                    js = target.read_text(encoding="utf-8", errors="replace")
+                    return f"<script>\n{js}\n</script>"
+            except Exception:
+                pass
+            return m.group(0)
+        html_text = re.sub(r"<script[^>]*src=\"([^\"]+)\"[^>]*>\s*</script>", repl_script, html_text, flags=re.IGNORECASE)
+        return html_text
+    except Exception:
+        return html_text
+
 def sidebar_live_preview_and_download(final_state):
     with st.sidebar:
         st.divider()
@@ -135,6 +167,7 @@ def sidebar_live_preview_and_download(final_state):
                 try:
                     html_path = PROJECT_DIR / selected
                     html_text = html_path.read_text(encoding="utf-8", errors="replace")
+                    html_text = inline_assets(html_text, html_path)
                     st.components.v1.html(html_text, height=500, scrolling=True)
                 except Exception as e:
                     st.caption(f"(Could not render HTML: {e})")
@@ -142,12 +175,10 @@ def sidebar_live_preview_and_download(final_state):
                 st.caption("No HTML files to preview yet.")
 
             # Download zip after full generation completes
-            status = None
-            if isinstance(final_state, dict):
-                status = final_state.get("status")
-            if status == "DONE":
+            if files:
                 st.divider()
-                st.caption("Generation complete. Download the entire folder:")
+                st.caption("Download generated files:")
+                # Zip only generated_project
                 try:
                     buf = io.BytesIO()
                     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -164,6 +195,46 @@ def sidebar_live_preview_and_download(final_state):
                     )
                 except Exception as e:
                     st.caption(f"(Could not create zip: {e})")
+
+                # Zip source code + generated_project
+                try:
+                    root = Path.cwd()
+                    src_buf = io.BytesIO()
+                    include_files = [
+                        root / "app.py",
+                        root / "main.py",
+                        root / "README.md",
+                        root / "requirements.txt",
+                        root / "Procfile",
+                        root / "LICENSE",
+                        root / "streamlit_app.py",
+                    ]
+                    exclude_dirs = {"loveable_env", "myenv", ".venv", "venv", "Scripts", "build", "dist", "__pycache__"}
+                    with zipfile.ZipFile(src_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                        # Add source files
+                        for f in include_files:
+                            if f.exists() and f.is_file():
+                                zf.write(f, arcname=str(f.name))
+                        # Add agent and generated_project directories
+                        for base in [root / "agent", PROJECT_DIR]:
+                            if base.exists():
+                                for p in base.rglob("*"):
+                                    if p.is_file():
+                                        # Skip excluded directories
+                                        if any(part in exclude_dirs for part in p.parts):
+                                            continue
+                                        arc = str(p.relative_to(root))
+                                        zf.write(p, arcname=arc)
+                    src_buf.seek(0)
+                    st.download_button(
+                        label="Download code_and_generated_project.zip",
+                        data=src_buf.getvalue(),
+                        file_name="code_and_generated_project.zip",
+                        mime="application/zip",
+                        use_container_width=True,
+                    )
+                except Exception as e:
+                    st.caption(f"(Could not create full zip: {e})")
 
 # Prompt input card
 st.markdown("<div class='lovable-card'>", unsafe_allow_html=True)
@@ -331,6 +402,7 @@ else:
             with st.expander("Live Preview: index.html", expanded=True):
                 try:
                     html = index_html.read_text(encoding="utf-8", errors="replace")
+                    html = inline_assets(html, index_html)
                     st.components.v1.html(html, height=600, scrolling=True)
                 except Exception as e:
                     st.write(f"(Could not render HTML: {e})")

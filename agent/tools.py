@@ -1,5 +1,6 @@
 import pathlib
 import subprocess
+import re
 from typing import Tuple
 
 from langchain_core.tools import tool
@@ -7,11 +8,19 @@ from langchain_core.tools import tool
 PROJECT_ROOT = pathlib.Path.cwd() / "generated_project"
 
 
+def _normalize_rel_path(path: str) -> str:
+    s = (path or "").strip().replace("\\", "/")
+    s = re.sub(r"^(?:\./)?generated_project/+", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"^(?:[A-Za-z]:)?/+", "", s)
+    return s or "."
+
 def safe_path_for_project(path: str) -> pathlib.Path:
-    p = (PROJECT_ROOT / path).resolve()
-    if PROJECT_ROOT.resolve() not in p.parents and PROJECT_ROOT.resolve() != p.parent and PROJECT_ROOT.resolve() != p:
-        raise ValueError("Attempt to write outside project root")
-    return p
+    rel = _normalize_rel_path(path)
+    p = (PROJECT_ROOT / rel).resolve()
+    root = PROJECT_ROOT.resolve()
+    if p == root or root in p.parents:
+        return p
+    raise ValueError("Attempt to write outside project root")
 
 
 @tool

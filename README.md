@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="#-demo">🎥 Demo</a> •
+  <a href="https://lovable-clone-8d4d13d08df1.herokuapp.com/">🎥 Demo</a> •
   <a href="#-features">✨ Features</a> •
   <a href="#-architecture">🏗️ Architecture</a> •
   <a href="#-quick-start">🚀 Quick Start</a> •
@@ -23,6 +23,10 @@
 ---
 
 ## 🎯 Overview
+
+<p align="center">
+  <img src="Untitled video - Made with Clipchamp (3).gif" alt="Lovable Clone Demo" width="900"/>
+</p>
 
 Lovable Clone is a production-grade agentic coding system that autonomously generates full-stack applications. Built with LangGraph for multi-agent orchestration, it demonstrates advanced agentic patterns including:
 
@@ -829,8 +833,8 @@ AI Engineering Student | Building Production GenAI Systems
 
 - 🐙 GitHub: [@vivek34561](https://github.com/vivek34561)
 - 💼 LinkedIn: [vivek-gupta-0400452b6](https://linkedin.com/in/vivek-gupta-0400452b6)
-- 📧 Email: [your.email@example.com](mailto:your.email@example.com)
-- 🌐 Portfolio: [your-portfolio-link.com](https://your-portfolio-link.com)
+- 📧 Email: [your.email@example.com](mailto:vivekgupta3749@gmail.com)
+- 🌐 Portfolio: [your-portfolio-link.com](https://resume-sepia-seven.vercel.app/)
 
 ---
 

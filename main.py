@@ -2,7 +2,7 @@ import argparse
 import sys
 import traceback
 
-from agent.graph import agent
+from agent.graph import get_default_agent
 
 
 def main():
@@ -14,6 +14,7 @@ def main():
 
     try:
         user_prompt = input("Enter your project prompt: ")
+        agent = get_default_agent()
         result = agent.invoke(
             {"user_prompt": user_prompt},
             {"recursion_limit": args.recursion_limit}

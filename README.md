@@ -838,6 +838,17 @@ AI Engineering Student | Building Production GenAI Systems
 
 ---
 
+## ☁️ Streamlit Cloud Setup
+
+- In Streamlit Cloud, set your secrets:
+    - Open your app → Manage app → Settings → Secrets.
+    - Add `GROQ_API_KEY` with your Groq key value.
+    - (Optional) Add `OPENAI_API_KEY` if you plan to use OpenAI.
+
+- This app automatically reads `st.secrets["GROQ_API_KEY"]` and exports it to the environment so `langchain-groq` can initialize cleanly.
+
+---
+
 ## 🙏 Acknowledgments
 
 Built with amazing open-source tools:

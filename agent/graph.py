@@ -151,11 +151,40 @@ def build_agent(llm):
     return graph.compile()
 
 
-# Default agent for CLI usage
-default_llm = ChatGroq(model="openai/gpt-oss-120b")
-agent = build_agent(default_llm)
+def get_default_llm():
+    """Construct a default Groq LLM, loading the API key from env or Streamlit secrets.
+
+    This avoids import-time failures on platforms (e.g., Streamlit Cloud) where
+    secrets are provided via `st.secrets` rather than OS env vars.
+    """
+    import os
+    # Try env first (supports local .env via python-dotenv)
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        # Try Streamlit secrets if available
+        try:
+            import streamlit as st
+            api_key = st.secrets.get("GROQ_API_KEY")
+            if api_key:
+                # Make it visible to downstream libraries expecting env var
+                os.environ["GROQ_API_KEY"] = api_key
+        except Exception:
+            api_key = None
+
+    if not api_key:
+        raise RuntimeError(
+            "GROQ_API_KEY not found. Set it in your environment or Streamlit secrets."
+        )
+
+    return ChatGroq(model="openai/gpt-oss-120b", api_key=api_key)
+
+
+def get_default_agent():
+    """Convenience helper for CLI usage."""
+    return build_agent(get_default_llm())
 
 if __name__ == "__main__":
+    agent = get_default_agent()
     result = agent.invoke({"user_prompt": "Build a colourful modern todo app in html css and js"},
                           {"recursion_limit": 100})
     print("Final State:", result)

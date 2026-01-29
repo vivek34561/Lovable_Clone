@@ -14,6 +14,13 @@ from agent.tools import init_project_root
 # Load environment variables early
 load_dotenv()
 
+# If running on Streamlit Cloud, surface GROQ_API_KEY from secrets to env
+try:
+    if "GROQ_API_KEY" in st.secrets and not os.environ.get("GROQ_API_KEY"):
+        os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass
+
 # Ensure generated_project exists
 PROJECT_DIR = Path(init_project_root())
 
@@ -77,7 +84,7 @@ with st.sidebar:
     # Model selection inputs
     if provider == "Groq":
         groq_model = st.text_input("Groq model", value="openai/gpt-oss-120b")
-        groq_key_present = bool(os.environ.get("GROQ_API_KEY"))
+        groq_key_present = bool(os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY"))
         st.caption(f"GROQ_API_KEY: {'✅ present' if groq_key_present else '❌ missing'}")
     else:
         openai_model = st.text_input("OpenAI model", value="gpt-4o-mini")
@@ -246,7 +253,7 @@ user_prompt = st.text_area(
 )
 col_run, col_clear = st.columns([1, 1])
 run_disabled = not bool(user_prompt.strip()) or (
-    (provider == "Groq" and not bool(os.environ.get("GROQ_API_KEY"))) or
+    (provider == "Groq" and not bool(os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY"))) or
     (provider == "OpenAI" and not bool(st.session_state.get("OPENAI_API_KEY")))
 )
 run_clicked = col_run.button(
@@ -275,7 +282,8 @@ if run_clicked:
     try:
         if provider == "Groq":
             from langchain_groq.chat_models import ChatGroq
-            llm = ChatGroq(model=groq_model)
+            api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+            llm = ChatGroq(model=groq_model, api_key=api_key)
         else:
             from langchain_openai import ChatOpenAI
             llm = ChatOpenAI(model=openai_model, api_key=st.session_state.get("OPENAI_API_KEY"))
